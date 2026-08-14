@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCategoryGeneratorUrl, candidateRefsFromCategoryPage } from '../../tools/import_thai_audio_generator.mjs';
+import { buildCategoryGeneratorUrl, candidateRefsFromCategoryPage } from '../tools/import_thai_audio_generator.mjs';
 
 test('category generator URL fetches file metadata in the same paginated request', () => {
   const url = new URL(buildCategoryGeneratorUrl('Category:Thai pronunciation', 'next-token'));
@@ -24,7 +24,7 @@ test('category page candidate refs combine exact filename and exact Thai descrip
 });
 
 test('audio curl args cap retries and per-file runtime so one recording cannot stall the import', async () => {
-  const { buildAudioCurlArgs } = await import('../../tools/import_thai_audio_generator.mjs');
+  const { buildAudioCurlArgs } = await import('../tools/import_thai_audio_generator.mjs');
   const args = buildAudioCurlArgs('https://upload.wikimedia.org/test.ogg', '/tmp/test.ogg');
   const retryIndex = args.indexOf('--retry');
   const maxTimeIndex = args.indexOf('--max-time');

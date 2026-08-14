@@ -1,65 +1,40 @@
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
-
-export function createPacedFetch(fetchImpl, {
-  gapMs = 1000,
-  retryDelays = [1500, 3000, 6000],
-  maxRetryAfterMs = 10000,
+export function createPacedFetch(fetchImpl = fetch, {
+  gapMs = 1200,
+  nowFn = () => Date.now(),
   sleepFn = ms => new Promise(resolve => setTimeout(resolve, ms)),
-  nowFn = () => Date.now()
+  retryDelays = [2000, 5000, 10000],
+  maxRetryAfterMs = 15000
 } = {}) {
-  let queue = Promise.resolve();
-  let lastStartedAt = 0;
+  let chain = Promise.resolve();
+  let lastStartedAt = null;
 
-  return function pacedFetch(url, options) {
-    const task = queue.then(async () => {
-      const gap = Number(gapMs);
-      if (lastStartedAt && Number.isFinite(gap) && gap > 0) {
-        const remaining = gap - (nowFn() - lastStartedAt);
-        if (remaining > 0) await sleepFn(remaining);
-      }
+  async function run(url, options) {
+    if (lastStartedAt !== null) {
+      const wait = Math.max(0, gapMs - (nowFn() - lastStartedAt));
+      if (wait > 0) await sleepFn(wait);
+    }
+    lastStartedAt = nowFn();
 
-      for (let attempt = 0; attempt <= retryDelays.length; attempt += 1) {
-        lastStartedAt = nowFn();
-        const response = await fetchImpl(url, options);
-        if (response.status !== 429 || attempt === retryDelays.length) return response;
-
-        const retryAfterSeconds = Number(response.headers?.get?.('retry-after'));
-        const requestedMs = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
-          ? retryAfterSeconds * 1000
-          : retryDelays[attempt];
-        const cappedMs = Number.isFinite(maxRetryAfterMs) && maxRetryAfterMs > 0
-          ? Math.min(requestedMs, maxRetryAfterMs)
-          : requestedMs;
-        await sleepFn(Math.max(retryDelays[attempt], cappedMs));
-      }
-      throw new Error('unreachable fetch retry state');
-    });
-
-    queue = task.then(() => undefined, () => undefined);
-    return task;
-  };
-}
-
-export async function runPacedImport({
-  repoRoot = process.cwd(),
-  fetchImpl = globalThis.fetch,
-  gapMs = Number(process.env.COMMONS_REQUEST_GAP_MS || 1000)
-} = {}) {
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = createPacedFetch(fetchImpl, { gapMs });
-  try {
-    const { runImport } = await import('./import_thai_audio.mjs');
-    return await runImport({ repoRoot, download: true });
-  } finally {
-    globalThis.fetch = originalFetch;
+    let response;
+    for (let attempt = 0; attempt <= retryDelays.length; attempt += 1) {
+      response = await fetchImpl(url, options);
+      if (response.status !== 429 && response.status !== 503) return response;
+      if (attempt === retryDelays.length) return response;
+      const retryAfterSeconds = Number(response.headers?.get?.('retry-after'));
+      const requested = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+        ? retryAfterSeconds * 1000
+        : retryDelays[attempt];
+      const capped = Number.isFinite(maxRetryAfterMs) && maxRetryAfterMs > 0
+        ? Math.min(requested, maxRetryAfterMs)
+        : requested;
+      await sleepFn(Math.max(retryDelays[attempt], capped));
+    }
+    return response;
   }
-}
 
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isMain) {
-  runPacedImport({ repoRoot: process.cwd() }).catch(error => {
-    console.error(error);
-    process.exitCode = 1;
-  });
+  return (url, options) => {
+    const result = chain.then(() => run(url, options));
+    chain = result.catch(() => {});
+    return result;
+  };
 }
