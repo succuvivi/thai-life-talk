@@ -1,0 +1,45 @@
+name: Import Thai Human Audio
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: thai-human-audio-import
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Download exact open-license Thai recordings
+        env:
+          COMMONS_REQUEST_GAP_MS: '1200'
+        run: node tools/import_thai_audio_generator.mjs
+
+      - name: Run tests
+        run: npm test
+
+      - name: Commit generated audio assets
+        run: |
+          if git diff --quiet -- audio data/audio-map.js; then
+            echo 'No generated audio changes.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add audio data/audio-map.js
+          git commit -m 'chore: refresh open-license Thai human audio'
+          git push

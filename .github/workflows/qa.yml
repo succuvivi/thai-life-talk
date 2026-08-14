@@ -1,0 +1,51 @@
+name: Thai Life Talk QA
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Run tests
+        run: npm test
+
+      - name: Check JavaScript syntax
+        run: find js data tools -type f \( -name '*.js' -o -name '*.mjs' \) -print0 | xargs -0 -n1 node --check
+
+      - name: Guard native swipe UI
+        run: |
+          if grep -R -E 'data-series-nav|class="series-nav' index.html learn.html js styles.css; then
+            echo 'Legacy series arrow navigation found'
+            exit 1
+          fi
+
+      - name: Guard public runtime from API keys
+        run: |
+          if grep -R -E 'API_KEY|aiforthai|api\.aiforthai' index.html learn.html audio-sources.html js data; then
+            echo 'Public runtime contains an API-key/provider hook'
+            exit 1
+          fi
+
+      - name: Print human audio coverage
+        run: |
+          node --input-type=module <<'NODE'
+          import { ENTRIES } from './data/index.js';
+          import { AUDIO_BY_ENTRY_ID } from './data/audio-map.js';
+          const human = Object.keys(AUDIO_BY_ENTRY_ID).length;
+          console.log(`Human word audio: ${human} / ${ENTRIES.length}`);
+          console.log(`Device-TTS fallback: ${ENTRIES.length - human} / ${ENTRIES.length}`);
+          NODE
