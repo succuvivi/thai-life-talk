@@ -4,7 +4,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { ENTRIES } from '../data/index.js';
 import { AUDIO_BY_ENTRY_ID } from '../data/audio-map.js';
-import { isAllowedAudioLicense } from '../../tools/import_thai_audio.mjs';
+import { isAllowedAudioLicense } from '../tools/import_thai_audio.mjs';
 
 const manifest = JSON.parse(readFileSync(new URL('../audio/sources.json', import.meta.url), 'utf8'));
 const entriesById = new Map(ENTRIES.map(entry => [entry.id, entry]));

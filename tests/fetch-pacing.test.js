@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createPacedFetch } from '../../tools/run_thai_audio_import.mjs';
+import { createPacedFetch } from '../tools/run_thai_audio_import.mjs';
 
 test('paced fetch serializes concurrent requests and inserts a gap', async () => {
   let clock = 1000;

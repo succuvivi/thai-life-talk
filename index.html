@@ -3,32 +3,91 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f7f6f2">
-  <title>泰语生活词库</title>
+  <meta name="theme-color" content="#f4efe6">
+  <meta name="description" content="Thai Life Talk：给中文用户的泰国生活口语。360 个高频词、常用搭配、真实例句、真人泰语发音、18 个生活场景。">
+  <title>Thai Life Talk｜泰国生活口语</title>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-  <header class="topbar">
-    <div>
-      <p class="eyebrow">在泰国，直接开口</p>
-      <h1>泰语生活词库</h1>
-      <p class="lede">按真实生活场景学高频词、搭配和例句。不会认泰文也能用。中文近似音只做辅助，发音以点读为准。</p>
+<body class="home-page">
+  <header class="brand-hero">
+    <div class="brand-hero-inner">
+      <div class="brand-copy">
+        <p class="brand-kicker">THAI LIFE TALK</p>
+        <h1>Thai Life Talk</h1>
+        <p class="brand-subtitle">泰国生活口语 · 真实场景开口就用</p>
+        <p class="brand-intro">给在泰国真实生活的人用的实用泰语。不是为了先学会读泰文，而是为了在点餐、打车、购物、租房、看病、办事、交朋友时，能马上说出真正用得上的泰语。</p>
+        <div class="hero-actions">
+          <a class="primary-cta" href="learn.html">开始学泰语</a>
+          <a class="secondary-link" href="audio-sources.html">🎙 真人音频来源</a>
+        </div>
+      </div>
+      <div class="hero-note" aria-label="学习方式">
+        <span class="hero-note-label">先会说，再慢慢会读</span>
+        <strong>中文意思 → 罗马音 / 中文近似音 → 真人泰语</strong>
+        <small>泰文保留作标准参考；发音以真人录音或泰语设备语音为准。</small>
+      </div>
     </div>
-    <nav class="top-actions" aria-label="学习设置">
-      <button type="button" data-action="toggle-thai">泰文：显示</button>
-      <button type="button" data-action="toggle-speed">语速：正常</button>
-      <a class="audio-sources-link" href="audio-sources.html">🎙 音频来源</a>
-    </nav>
   </header>
 
-  <form id="global-search" class="search-bar" action="learn.html" method="get">
-    <label class="sr-only" for="q">搜索中文词汇或场景</label>
-    <input id="q" name="q" type="search" placeholder="搜：辣、空调、快递、多少钱…" autocomplete="off">
-    <button type="submit">搜索</button>
-  </form>
+  <main class="home-main">
+    <section class="proof-grid" aria-label="内容概览">
+      <div class="proof-card"><strong>360</strong><span>个高频词</span></div>
+      <div class="proof-card"><strong>18</strong><span>个生活场景</span></div>
+      <div class="proof-card"><strong>搭配 + 例句</strong><span>直接拿来用</span></div>
+      <div class="proof-card"><strong>真人优先</strong><span>没有才用设备语音</span></div>
+    </section>
 
-  <a class="favorites-link" href="learn.html?favorites=1">⭐ 我的收藏</a>
-  <section id="scene-grid" class="scene-grid" aria-label="生活场景"></section>
+    <section class="home-tools" aria-label="搜索与学习设置">
+      <form id="global-search" class="search-bar" action="learn.html" method="get">
+        <label class="sr-only" for="q">搜索中文词汇或场景</label>
+        <input id="q" name="q" type="search" placeholder="搜：辣、空调、快递、多少钱…" autocomplete="off">
+        <button type="submit">搜索</button>
+      </form>
+      <div class="home-quick-actions">
+        <a class="favorites-link" href="learn.html?favorites=1">⭐ 我的收藏</a>
+        <div class="top-actions" aria-label="学习设置">
+          <button type="button" data-action="toggle-thai">泰文：显示</button>
+          <button type="button" data-action="toggle-speed">语速：正常</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="home-section" aria-labelledby="scene-title">
+      <div class="section-heading">
+        <p class="eyebrow">REAL LIFE SCENES</p>
+        <h2 id="scene-title">从你今天会遇到的场景开始</h2>
+        <p>点餐、咖啡、便利店、市场、打车、租房、维修、看病、银行、朋友聊天……需要的时候直接找到能说的词和句子。</p>
+      </div>
+      <div id="scene-grid" class="scene-grid" aria-label="18 个生活场景"></div>
+    </section>
+
+    <section class="home-section how-section" aria-labelledby="how-title">
+      <div class="section-heading">
+        <p class="eyebrow">HOW TO USE</p>
+        <h2 id="how-title">不用先背泰文字母，也能开始开口</h2>
+      </div>
+      <div class="how-grid">
+        <article><span>01</span><strong>先看中文意思</strong><p>先确认你真正想表达的意思，不从拼写开始增加负担。</p></article>
+        <article><span>02</span><strong>跟着发音辅助开口</strong><p>罗马音和中文近似音帮助你快速模仿，但不把它们当成标准泰语。</p></article>
+        <article><span>03</span><strong>反复听真人泰语</strong><p>有开放许可真人录音就优先播放真人；没有才回退到设备泰语语音。</p></article>
+        <article><span>04</span><strong>同类词整张卡左右滑</strong><p>同一个真实场景里的相近词放在一起，手机上直接滑整张词卡切换。</p></article>
+      </div>
+    </section>
+
+    <section class="audio-note" aria-labelledby="audio-title">
+      <div>
+        <p class="eyebrow">HUMAN AUDIO FIRST</p>
+        <h2 id="audio-title">真人录音优先，不用 API Key</h2>
+        <p>网站会优先播放已经验证许可并保存在项目里的真人泰语录音。还没有真人录音的词继续使用设备自带泰语 TTS，保证每张词卡都能点读。</p>
+      </div>
+      <a class="secondary-link" href="audio-sources.html">查看录音来源与许可 →</a>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <strong>Thai Life Talk</strong>
+    <span>泰国生活口语 · 真实场景开口就用</span>
+  </footer>
 
   <script type="module" src="js/home.js"></script>
 </body>
