@@ -5,7 +5,7 @@ import {
   isAllowedAudioLicense,
   chooseBestCandidate,
   buildAudioAssignments
-} from '../tools/import_thai_audio.mjs';
+} from '../../tools/import_thai_audio.mjs';
 
 test('extractLinguaLibreTarget returns exact Thai transcription suffix', () => {
   assert.equal(extractLinguaLibreTarget('File:LL-Q9217 (tha)-Patsagorn Y.-กาแฟ.wav'), 'กาแฟ');
@@ -47,7 +47,7 @@ test('one Thai recording is assigned to every entry with the same Thai target', 
 });
 
 test('parseWiktionaryAudioMap keeps exact Thai keys and Commons filenames', async () => {
-  const { parseWiktionaryAudioMap } = await import('../tools/import_thai_audio.mjs');
+  const { parseWiktionaryAudioMap } = await import('../../tools/import_thai_audio.mjs');
   const source = `return {\n  ["ไก่"] = "Th-gai.ogg",\n  ["ชา"] = "Th-cha.ogg",\n  ["ปฺระ-เทด-ไท"] = "Th-Thailand.ogg",\n}`;
   const map = parseWiktionaryAudioMap(source);
   assert.equal(map.get('ไก่'), 'File:Th-gai.ogg');
@@ -56,27 +56,27 @@ test('parseWiktionaryAudioMap keeps exact Thai keys and Commons filenames', asyn
 });
 
 test('extractDirectThaiFilename accepts exact Thai-named files in Commons pronunciation category', async () => {
-  const { extractDirectThaiFilename } = await import('../tools/import_thai_audio.mjs');
+  const { extractDirectThaiFilename } = await import('../../tools/import_thai_audio.mjs');
   assert.equal(extractDirectThaiFilename('File:Th-น้ำ.ogg'), 'น้ำ');
   assert.equal(extractDirectThaiFilename('File:Th-ข้าว.oga'), 'ข้าว');
   assert.equal(extractDirectThaiFilename('File:Th-cha.ogg'), null);
 });
 
 test('audio file detection accepts Commons Ogg application MIME and standard audio MIME', async () => {
-  const { isSupportedAudioFile } = await import('../tools/import_thai_audio.mjs');
+  const { isSupportedAudioFile } = await import('../../tools/import_thai_audio.mjs');
   assert.equal(isSupportedAudioFile('File:Th-cha.ogg', 'application/ogg'), true);
   assert.equal(isSupportedAudioFile('File:voice.wav', 'audio/wav'), true);
   assert.equal(isSupportedAudioFile('File:photo.jpg', 'image/jpeg'), false);
 });
 
 test('canonicalizeMediaUrl removes Wikimedia tracking parameters without changing file path', async () => {
-  const { canonicalizeMediaUrl } = await import('../tools/import_thai_audio.mjs');
+  const { canonicalizeMediaUrl } = await import('../../tools/import_thai_audio.mjs');
   const value = canonicalizeMediaUrl('https://upload.wikimedia.org/wikipedia/commons/9/94/Th-x.oga?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original');
   assert.equal(value, 'https://upload.wikimedia.org/wikipedia/commons/9/94/Th-x.oga');
 });
 
 test('fetchWithRateLimitRetry retries 429 responses then returns success', async () => {
-  const { fetchWithRateLimitRetry } = await import('../tools/import_thai_audio.mjs');
+  const { fetchWithRateLimitRetry } = await import('../../tools/import_thai_audio.mjs');
   let calls = 0;
   const fetchImpl = async () => {
     calls += 1;
@@ -95,7 +95,7 @@ test('fetchWithRateLimitRetry retries 429 responses then returns success', async
 });
 
 test('findExactThaiTargets matches complete Thai targets in Commons descriptions, not substrings', async () => {
-  const { findExactThaiTargets } = await import('../tools/import_thai_audio.mjs');
+  const { findExactThaiTargets } = await import('../../tools/import_thai_audio.mjs');
   const wanted = new Set(['ชา', 'มี', 'ไม่มี', 'กาแฟ']);
   assert.deepEqual(findExactThaiTargets('Pronunciation of word "ชา (chaa)" in Thai. Male voice.', wanted), ['ชา']);
   assert.deepEqual(findExactThaiTargets('English: Thai pronunciation of ไม่มี', wanted), ['ไม่มี']);
@@ -103,7 +103,7 @@ test('findExactThaiTargets matches complete Thai targets in Commons descriptions
 });
 
 test('descriptionTargetRefs derives exact Thai targets from Commons metadata', async () => {
-  const { descriptionTargetRefs } = await import('../tools/import_thai_audio.mjs');
+  const { descriptionTargetRefs } = await import('../../tools/import_thai_audio.mjs');
   const page = {
     title: 'File:Th-cha.ogg',
     imageinfo: [{
@@ -119,7 +119,7 @@ test('descriptionTargetRefs derives exact Thai targets from Commons metadata', a
 });
 
 test('linguaLibreArchiveBasename maps Commons file titles to dataset filenames', async () => {
-  const { linguaLibreArchiveBasename } = await import('../tools/import_thai_audio.mjs');
+  const { linguaLibreArchiveBasename } = await import('../../tools/import_thai_audio.mjs');
   assert.equal(
     linguaLibreArchiveBasename('File:LL-Q9217 (tha)-Patsagorn Y.-กาแฟ.wav'),
     'LL-Q9217 (tha)-Patsagorn Y.-กาแฟ.wav'
@@ -128,7 +128,7 @@ test('linguaLibreArchiveBasename maps Commons file titles to dataset filenames',
 });
 
 test('fetchWithRateLimitRetry caps excessive Retry-After values', async () => {
-  const { fetchWithRateLimitRetry } = await import('../tools/import_thai_audio.mjs');
+  const { fetchWithRateLimitRetry } = await import('../../tools/import_thai_audio.mjs');
   let calls = 0;
   const fetchImpl = async () => {
     calls += 1;
@@ -149,7 +149,7 @@ test('fetchWithRateLimitRetry caps excessive Retry-After values', async () => {
 });
 
 test('interDownloadDelayMs delays every remote download after the first', async () => {
-  const { interDownloadDelayMs } = await import('../tools/import_thai_audio.mjs');
+  const { interDownloadDelayMs } = await import('../../tools/import_thai_audio.mjs');
   assert.equal(interDownloadDelayMs(0, 1200), 0);
   assert.equal(interDownloadDelayMs(1, 1200), 1200);
   assert.equal(interDownloadDelayMs(4, 1500), 1500);
