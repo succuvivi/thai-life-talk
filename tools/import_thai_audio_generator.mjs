@@ -1,10 +1,42 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   extractLinguaLibreTarget,
   extractDirectThaiFilename,
-  descriptionTargetRefs
+  descriptionTargetRefs,
+  parseWiktionaryAudioMap,
+  isSupportedAudioFile,
+  isAllowedAudioLicense,
+  chooseBestCandidate,
+  buildAudioAssignments,
+  canonicalizeMediaUrl
 } from './import_thai_audio.mjs';
+import { createPacedFetch } from './run_thai_audio_import.mjs';
 
+const execFileAsync = promisify(execFile);
 const COMMONS_API = 'https://commons.wikimedia.org/w/api.php';
+const WIKTIONARY_API = 'https://th.wiktionary.org/w/api.php';
+const WIKTIONARY_AUDIO_MODULE = 'มอดูล:th-pron/files';
+const LINGUA_LIBRE_CATEGORY = 'Category:Lingua Libre pronunciation-tha';
+const THAI_PRONUNCIATION_CATEGORY = 'Category:Thai pronunciation';
+const USER_AGENT = 'ThaiLifeTalkAudioImporter/1.0 (GitHub: succuvivi/thai-life-talk)';
+
+function stripHtml(value) {
+  return String(value || '')
+    .replace(/<br\s*\/?\s*>/gi, ' ')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extValue(meta, key) { return meta?.[key]?.value ?? ''; }
 
 export function buildCategoryGeneratorUrl(category, continuation = null) {
   const url = new URL(COMMONS_API);
@@ -30,52 +62,13 @@ export function candidateRefsFromCategoryPage(page, wantedThai, { linguaLibre = 
     refs.push({
       title: page.title,
       target: filenameTarget,
-      source: linguaLibre
-        ? 'Wikimedia Commons / Lingua Libre'
-        : 'Wikimedia Commons / direct Thai filename'
+      source: linguaLibre ? 'Wikimedia Commons / Lingua Libre' : 'Wikimedia Commons / direct Thai filename'
     });
   }
   refs.push(...descriptionTargetRefs(page, wantedThai));
   const unique = new Map();
   for (const ref of refs) unique.set(`${ref.target}\u0000${ref.source}`, ref);
   return [...unique.values()];
-}
-
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-import { pathToFileURL, fileURLToPath } from 'node:url';
-import {
-  parseWiktionaryAudioMap,
-  isSupportedAudioFile,
-  isAllowedAudioLicense,
-  chooseBestCandidate,
-  buildAudioAssignments,
-  canonicalizeMediaUrl
-} from './import_thai_audio.mjs';
-import { createPacedFetch } from './run_thai_audio_import.mjs';
-
-const execFileAsync = promisify(execFile);
-const WIKTIONARY_API = 'https://th.wiktionary.org/w/api.php';
-const WIKTIONARY_AUDIO_MODULE = 'มอดูล:th-pron/files';
-const LINGUA_LIBRE_CATEGORY = 'Category:Lingua Libre pronunciation-tha';
-const THAI_PRONUNCIATION_CATEGORY = 'Category:Thai pronunciation';
-
-function stripHtml(value) {
-  return String(value || '')
-    .replace(/<br\s*\/?\s*>/gi, ' ')
-    .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function extValue(meta, key) {
-  return meta?.[key]?.value ?? '';
 }
 
 function normalizeCandidate(page, ref) {
@@ -116,23 +109,18 @@ function audioMapModule(assignments) {
 }
 
 async function fetchJson(fetchImpl, url) {
-  const response = await fetchImpl(url, {
-    headers: {
-      'User-Agent': 'ThaiLifeSpeakAudioImporter/1.0 (GitHub: succuvivi/english-deep-talk-plan)',
-      'Accept': 'application/json'
-    }
-  });
+  const response = await fetchImpl(url, { headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' } });
   if (!response.ok) throw new Error(`HTTP ${response.status}: ${url}`);
   return response.json();
 }
 
-async function fetchCategoryCandidates(fetchImpl, category, wantedThai, { linguaLibre = false } = {}) {
+async function fetchCategoryCandidates(fetchImpl, category, wantedThai, options = {}) {
   const output = [];
   let continuation = null;
   do {
     const data = await fetchJson(fetchImpl, buildCategoryGeneratorUrl(category, continuation));
     for (const page of data?.query?.pages || []) {
-      for (const ref of candidateRefsFromCategoryPage(page, wantedThai, { linguaLibre })) {
+      for (const ref of candidateRefsFromCategoryPage(page, wantedThai, options)) {
         const candidate = normalizeCandidate(page, ref);
         if (candidate) output.push(candidate);
       }
@@ -156,15 +144,12 @@ async function fetchWiktionaryCandidates(fetchImpl, wantedThai) {
     const title = map.get(thai);
     if (title) refs.push({ title, target: thai, source: 'Thai Wiktionary pronunciation index / Wikimedia Commons' });
   }
-  if (!refs.length) return [];
-
   const refsByTitle = new Map();
   for (const ref of refs) {
     const key = ref.title.replaceAll('_', ' ').normalize('NFC');
     if (!refsByTitle.has(key)) refsByTitle.set(key, []);
     refsByTitle.get(key).push(ref);
   }
-
   const output = [];
   const titles = [...refsByTitle.keys()];
   for (let i = 0; i < titles.length; i += 20) {
@@ -189,15 +174,9 @@ async function fetchWiktionaryCandidates(fetchImpl, wantedThai) {
 
 export function buildAudioCurlArgs(url, destination) {
   return [
-    '-fL',
-    '--connect-timeout', '10',
-    '--max-time', '25',
-    '--retry', '1',
-    '--retry-all-errors',
-    '--retry-delay', '2',
-    '-A', 'ThaiLifeSpeakAudioImporter/1.0 (GitHub: succuvivi/english-deep-talk-plan)',
-    canonicalizeMediaUrl(url),
-    '-o', destination
+    '-fL', '--connect-timeout', '10', '--max-time', '25', '--retry', '1',
+    '--retry-all-errors', '--retry-delay', '2', '-A', USER_AGENT,
+    canonicalizeMediaUrl(url), '-o', destination
   ];
 }
 
@@ -210,7 +189,7 @@ async function downloadWithCurl(url, destination) {
 }
 
 export async function runGeneratorImport({ repoRoot = process.cwd(), gapMs = 1200 } = {}) {
-  const { ENTRIES } = await import(pathToFileURL(path.join(repoRoot, 'thai/data/index.js')).href);
+  const { ENTRIES } = await import(pathToFileURL(path.join(repoRoot, 'data/index.js')).href);
   const entries = ENTRIES.map(({ id, th }) => ({ id, th }));
   const byThai = new Map();
   for (const entry of entries) {
@@ -219,28 +198,22 @@ export async function runGeneratorImport({ repoRoot = process.cwd(), gapMs = 120
   }
   const wantedThai = new Set(byThai.keys());
   const fetchImpl = createPacedFetch(globalThis.fetch, { gapMs });
-
   const candidates = [
     ...await fetchCategoryCandidates(fetchImpl, LINGUA_LIBRE_CATEGORY, wantedThai, { linguaLibre: true }),
     ...await fetchCategoryCandidates(fetchImpl, THAI_PRONUNCIATION_CATEGORY, wantedThai),
     ...await fetchWiktionaryCandidates(fetchImpl, wantedThai)
   ];
-
   const grouped = new Map();
   for (const candidate of candidates) {
     if (!grouped.has(candidate.target)) grouped.set(candidate.target, []);
     grouped.get(candidate.target).push(candidate);
   }
-
   const selectedByThai = new Map();
   for (const [thai, options] of grouped) {
     const selected = chooseBestCandidate(options);
     if (!selected) continue;
     const canonical = [...byThai.get(thai)].sort((a, b) => a.id.localeCompare(b.id))[0];
-    selectedByThai.set(thai, {
-      ...selected,
-      localPath: `./audio/words/${canonical.id}${safeExtension(selected.url, selected.mime)}`
-    });
+    selectedByThai.set(thai, { ...selected, localPath: `./audio/words/${canonical.id}${safeExtension(selected.url, selected.mime)}` });
   }
 
   console.log(`Vocabulary entries: ${entries.length}`);
@@ -248,10 +221,9 @@ export async function runGeneratorImport({ repoRoot = process.cwd(), gapMs = 120
   console.log(`Allowed exact candidates: ${candidates.length}`);
   console.log(`Matched unique Thai targets: ${selectedByThai.size}`);
 
-  const outputDir = path.join(repoRoot, 'thai/audio/words');
+  const outputDir = path.join(repoRoot, 'audio/words');
   await fs.rm(outputDir, { recursive: true, force: true });
   await fs.mkdir(outputDir, { recursive: true });
-
   const successfulByThai = new Map();
   const manifest = [];
   let attempted = 0;
@@ -259,22 +231,16 @@ export async function runGeneratorImport({ repoRoot = process.cwd(), gapMs = 120
   for (const [thai, candidate] of [...selectedByThai.entries()].sort(([a], [b]) => a.localeCompare(b, 'th'))) {
     if (attempted > 0) await new Promise(resolve => setTimeout(resolve, 750));
     attempted += 1;
-    const destination = path.join(repoRoot, 'thai', candidate.localPath.replace(/^\.\//, ''));
+    const destination = path.join(repoRoot, candidate.localPath.replace(/^\.\//, ''));
     try {
       const bytes = await downloadWithCurl(candidate.url, destination);
       successfulByThai.set(thai, candidate);
       for (const entry of byThai.get(thai)) {
         manifest.push({
-          entryId: entry.id,
-          thai,
-          localPath: candidate.localPath,
-          source: candidate.source,
-          sourceUrl: candidate.descriptionUrl,
-          creator: candidate.creator,
-          license: candidate.license,
-          licenseUrl: candidate.licenseUrl,
-          sourceFileTitle: candidate.title,
-          bytes
+          entryId: entry.id, thai, localPath: candidate.localPath,
+          source: candidate.source, sourceUrl: candidate.descriptionUrl,
+          creator: candidate.creator, license: candidate.license,
+          licenseUrl: candidate.licenseUrl, sourceFileTitle: candidate.title, bytes
         });
       }
     } catch (error) {
@@ -283,12 +249,10 @@ export async function runGeneratorImport({ repoRoot = process.cwd(), gapMs = 120
       await fs.rm(destination, { force: true });
     }
   }
-
   manifest.sort((a, b) => a.entryId.localeCompare(b.entryId));
   const assignments = buildAudioAssignments(entries, successfulByThai);
-  await fs.writeFile(path.join(repoRoot, 'thai/audio/sources.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-  await fs.writeFile(path.join(repoRoot, 'thai/data/audio-map.js'), audioMapModule(assignments));
-
+  await fs.writeFile(path.join(repoRoot, 'audio/sources.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+  await fs.writeFile(path.join(repoRoot, 'data/audio-map.js'), audioMapModule(assignments));
   const human = Object.keys(assignments).length;
   console.log(`Human word audio: ${human} / ${entries.length}`);
   console.log(`Unique human recordings: ${successfulByThai.size} / ${wantedThai.size}`);
@@ -299,11 +263,6 @@ export async function runGeneratorImport({ repoRoot = process.cwd(), gapMs = 120
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
-  runGeneratorImport({
-    repoRoot: process.cwd(),
-    gapMs: Number(process.env.COMMONS_REQUEST_GAP_MS || 1200)
-  }).catch(error => {
-    console.error(error);
-    process.exitCode = 1;
-  });
+  runGeneratorImport({ repoRoot: process.cwd(), gapMs: Number(process.env.COMMONS_REQUEST_GAP_MS || 1200) })
+    .catch(error => { console.error(error); process.exitCode = 1; });
 }
